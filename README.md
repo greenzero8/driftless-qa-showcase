@@ -211,14 +211,15 @@ against the score. No threshold in the codebase changes without running it.
 
 ---
 
-## What I'd do next
+## How this was built
 
-- **Bound the plain-text slow path.** Alignment cost is fine for real copy docs but grows badly on
-  pathological plain-text input. There's a result-preserving prefilter available — the similarity
-  ratio can't exceed `min(len)/max(len)`, so a pair whose upper bound already loses can skip the
-  Levenshtein entirely.
-- **Persist eval runs** so threshold changes can be compared across commits rather than judged one
-  run at a time.
+Driftless QA was built with [Claude Code](https://claude.com/claude-code), Anthropic's agentic
+coding tool, and this README was written with it too. The architecture, the product boundaries and
+the engineering decisions recorded above were mine to direct and review; a large share of the
+implementation was written by the model working to them.
+
+Worth stating plainly on a project that is itself about knowing where a model should be trusted and
+where it shouldn't.
 
 ---
 
