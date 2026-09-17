@@ -5,11 +5,21 @@
 A web app that compares approved email copy against the email that actually got built, and reports
 what changed during production.
 
-It **compares; it does not proofread.** If the approved copy has a typo and the final email
-reproduces it exactly, that passes. That boundary is the product.
+It **compares. It does not proofread.** If the approved copy has a typo and the final email
+reproduces it exactly, that passes.
 
 > This repository is a showcase. It documents the architecture and engineering decisions behind
 > Driftless QA. The application source is in a private repository.
+
+![The input screen: two boxes, approved copy on the left and the final email on the right](docs/input.png)
+
+Paste the approved copy on the left and the final email on the right. The right box takes a full
+ESP HTML export or plain text copied out of a test send.
+
+![Results: a red banner reading "5 differences need review", followed by finding cards comparing approved and final text side by side](docs/results.png)
+
+Each finding shows the approved text against what the email actually says, with a one-line
+explanation of the difference. Only failures drive the verdict at the top.
 
 ---
 
@@ -101,10 +111,9 @@ If alignment cannot confidently determine which part of the email a block became
 instead of comparing it against the wrong thing. That surfaces as a dismissable warning rather than
 a failure.
 
-This is a deliberate asymmetry. Only failures drive the top-line verdict; warnings never do. A false
-warning costs the user a few seconds. A false *failure* — a red banner on a correct email — destroys
-trust in every green result afterwards, which is the only thing that makes a green result worth
-anything.
+Only failures drive the verdict at the top of the results. Warnings never do. That split is
+deliberate: a false warning costs the user a few seconds, but a red banner on a correct email makes
+every green result after it harder to believe.
 
 ---
 
@@ -138,8 +147,8 @@ the cliff.
 because they were benchmarked independently, three runs each, after the shared eval set proved
 unable to separate them. The vision benchmark was decisive: on artwork with typos deliberately baked
 in, one candidate model read `Limted` as `Limited` and `Shiping` as `Shipping` at 0.99 confidence on
-every run — silently repairing the exact defect the step exists to catch. A cheaper model that
-*looks* flawless on an aggregate score can be actively wrong at the thing you bought it for.
+every run — silently repairing the exact defect the step exists to catch. A cheaper model can score well
+overall and still be wrong about the one thing you picked it for.
 
 **Fetching user-supplied image URLs is treated as a security boundary.** The app accepts arbitrary
 HTML from anonymous users, extracts URLs from it, and has the server fetch them — textbook SSRF
@@ -170,9 +179,9 @@ Outlook hacks and inline CSS).
 | Eval fixtures | **28** end-to-end email pairs — 14 clean, 14 with a planted defect |
 | Current eval score | **14/14 defects caught, at the correct severity, 0 false positives** |
 
-The eval set is the project's regression net for behaviour that unit tests can't express. Each
-fixture is a realistic approved-copy / final-email pair with a known expected outcome, covering
-clean cases that must stay clean (smart quotes, responsive duplicates, MJML wrappers, repeated CTAs,
+The eval set catches behaviour that unit tests can't express. Each fixture is a realistic
+approved-copy / final-email pair with a known expected outcome, covering clean cases that must stay
+clean (smart quotes, responsive duplicates, MJML wrappers, repeated CTAs,
 boilerplate footers) and defects that must be caught at the right level (changed wording, dropped
 sentences, injected paragraphs, reordered sections, capitalization drift).
 
@@ -217,9 +226,6 @@ Driftless QA was built with [Claude Code](https://claude.com/claude-code), Anthr
 coding tool, and this README was written with it too. The architecture, the product boundaries and
 the engineering decisions recorded above were mine to direct and review; a large share of the
 implementation was written by the model working to them.
-
-Worth stating plainly on a project that is itself about knowing where a model should be trusted and
-where it shouldn't.
 
 ---
 
