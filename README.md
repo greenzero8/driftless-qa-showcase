@@ -2,46 +2,31 @@
 
 **Live app: [driftlessqa.com](https://driftlessqa.com)**
 
-A web app that compares approved email copy against the email that actually got built, and reports
-what changed during production.
+Driftless QA checks a finished marketing email against the copy that was approved for it, and reports anything that changed along the way. You paste the approved copy on one side and the final email on the other, and it lists each difference with a short explanation.
 
-It **compares. It does not proofread.** If the approved copy has a typo and the final email
-reproduces it exactly, that passes.
+It compares. It does not proofread. If the approved copy has a typo and the final email repeats it exactly, that passes.
 
-> This repository is a showcase. It documents the architecture and engineering decisions behind
-> Driftless QA. The application source is in a private repository.
+This repository is a showcase of how the app is built and why. The application code is in a private repository.
 
-![The input screen: two boxes, approved copy on the left and the final email on the right](docs/input.png)
+![The input screen, with the approved copy box on the left and the final email box on the right](docs/input.png)
 
-Paste the approved copy on the left and the final email on the right. The right box takes a full
-ESP HTML export or plain text copied out of a test send.
+The left box takes the approved copy, pasted from a copy doc. The right box takes the email's HTML, or the text copied out of a test send.
 
-![Results: a red banner reading "5 differences need review", followed by finding cards comparing approved and final text side by side](docs/results.png)
+![Results: a red banner reading "5 differences need review", followed by cards comparing the approved and final text side by side](docs/results.png)
 
-Each finding shows the approved text against what the email actually says, with a one-line
-explanation of the difference. Only failures drive the verdict at the top.
+Each card shows the approved text next to what the email actually says, with a one-line explanation. Only failures count toward the verdict at the top.
 
----
+## Why it exists
 
-## The problem
+Email QA tools like Litmus and Email on Acid check rendering, links, accessibility and deliverability. None of them check whether the final email says what the approved copy said.
 
-Email QA platforms — Litmus, Email on Acid — are good at rendering, links, accessibility and
-deliverability. None of them answer a more basic question: **does the final email actually say what
-the approved copy said?**
+Copy changes during production. It gets moved from a copy doc into an email builder, edited late and reviewed by several people, and small changes still get through: a changed price, last month's offer, a button that lost its capitalization, a paragraph that was dropped. Once an email is sent, it can't be unsent. Driftless QA does that one check.
 
-Copy drifts during production. It moves from a copy doc into a template builder, gets edited late,
-and small changes survive to send past several rounds of human review: a changed price, last
-month's offer, a CTA that lost its capitalization, a paragraph quietly dropped. Once it sends,
-there is no unsending it.
+## How it works
 
-Driftless QA does that one check.
+Most of the comparison is ordinary code. It strips the HTML down to the visible text, sets aside things that aren't copy (such as the unsubscribe footer), and smooths over differences that don't matter, like curly versus straight quotes. Then it works out which part of the email each piece of approved copy became, compares the two word by word, and decides what kind of difference each one is and how serious it is.
 
----
-
-## Architecture
-
-The comparison is a nine-step pipeline. The deterministic core runs first and produces every
-verdict; two AI steps are layered on top and are strictly additive.
+AI is used in three places, each for a job ordinary code does badly: matching a heavily reworded paragraph to the approved version it came from, reading text that is part of an image, and writing the one-line explanation on each finding. The diagram shows the full pipeline for technical readers.
 
 ```
   PASTED INPUT
@@ -83,150 +68,77 @@ verdict; two AI steps are layered on top and are strictly additive.
                     PASS / FAIL / WARNING
 ```
 
-Images are handled on a parallel path: reachable `<img>` sources are fetched server-side and read
-in one batched vision call, so copy baked into a hero JPEG is not a blind spot.
+Images are handled alongside the main comparison. The server fetches each image in the email and reads all of them in one AI call, so copy inside a hero image gets checked too.
 
----
+## Two rules the design follows
 
-## The two rules
+**The AI suggests matches, and code makes every decision.** The AI may suggest which part of the email a piece of approved copy turned into. It never decides whether anything passes or fails. Every verdict comes from fixed rules in code. The matching prompt only asks which piece goes with which, and never asks what changed. That keeps the app away from the main problem with pasting two documents into a chatbot and asking for the differences, which is that a model will confidently describe differences that aren't there.
 
-Every design decision in the project resolves to one of these.
+**When the app isn't sure, it says so.** If the app can't tell with confidence which part of the email a block of approved copy became, it doesn't compare the block against a guess. It shows a warning instead. Warnings never turn the result red, and only failures do. A false warning costs the reader a few seconds, but a red result on a correct email would make every later green result harder to trust.
 
-### 1. The model proposes. Code decides.
+## Where AI is used
 
-A model is allowed to suggest *which approved block corresponds to which part of the email*. It is
-never allowed to return a pass or a fail. Every verdict is computed by deterministic code from the
-pairings it was given.
+| Step | How | Model | Why |
+|---|---|---|---|
+| Extracting and cleaning the text | Code | None | Mechanical and exactly specifiable. A model would add cost, delay and inconsistency for no benefit. |
+| Matching copy, first pass | Code (string similarity) | None | Handles clean, labeled copy on its own, so that kind of comparison never needs the AI step below it. |
+| Matching copy that was heavily rewritten | AI, structured output | Claude Opus 5.5 | Only sees what the first pass couldn't place. A reworded paragraph defeats string matching but is obvious to a person. |
+| Reading text inside images | AI, vision | Claude Opus 5 | Text inside artwork is invisible to every other check. Image findings are capped at warnings, because reading an image is never certain enough to fail an email. |
+| Pass and fail | Code, always | None | See the first rule above. |
+| Explaining each finding | AI, one call per comparison | Claude Sonnet 5.5 | The one step where the writing is the point. Falls back to plain built-in sentences if the call fails. |
 
-The tier-2 prompt asks only "which of these goes with which," and explicitly refuses to ask what
-changed or whether it matters. That separation is the guardrail against the main failure mode of
-simply pasting both documents into a chat window and asking — a model will confidently narrate
-differences that are not there.
+Every AI step is allowed to fail without breaking the app. When a call fails, the job tries a backup model first. If that fails too, the comparison still finishes and returns what the ordinary code produced.
 
-The practical consequence: **the same two documents always produce the same answer.**
+## Choosing and testing the models
 
-### 2. Never diff a pair you aren't confident about.
+The three AI jobs use different models because each job was tested on its own. The app's end-to-end test set can't tell models apart on these jobs, so a separate benchmark measures them directly: 31 generated images with known text (including typos baked into the artwork and hard cases like script fonts, faint text and letter-spaced capitals), 16 matching cases with 64 decisions that each have one right answer, and 19 real findings whose explanations are read side by side. Every model runs every job three times.
 
-If alignment cannot confidently determine which part of the email a block became, the app says so
-instead of comparing it against the wrong thing. That surfaces as a dismissable warning rather than
-a failure.
+A few results shaped the current setup. In September, Claude Haiku 4.5 read the typo "Limted" in an image as "Limited", at 99% confidence, on every run. It scored well overall, but it silently fixed the exact kind of mistake the image check exists to catch. The newest model wasn't the best choice for every job either. Claude Opus 5.5 read every test image correctly, but it rated its confidence on the hardest ones at exactly the app's 80% cutoff, where a small drop would make the app throw a correct reading away. So image reading stayed on Claude Opus 5.
 
-Only failures drive the verdict at the top of the results. Warnings never do. That split is
-deliberate: a false warning costs the user a few seconds, but a red banner on a correct email makes
-every green result after it harder to believe.
+The benchmark also tests each model at low, medium and high thinking levels, and more thinking wasn't always better. For image reading on Opus 5, high fixed a misread that low made twice in three runs, where it read letter-spaced capitals as "L I M I T E D". On Opus 5.5 the same change lowered its confidence until it started discarding correct readings. Each job's level is now set from these results: high for image reading, and medium for matching and explanations. Explanations moved to Claude Sonnet 5.5, which wrote them as accurately as Opus, about a second faster per call, at 40% of the price.
 
----
+Anthropic's status page showed problems affecting these models every week or two during September, usually for one to three hours, and most of them hit a single model. So each job has a backup on a different model:
 
-## Where AI is used, and where it deliberately isn't
-
-| Step | Approach | Why |
+| Job | Main model | Backup |
 |---|---|---|
-| Extraction, normalization, dedupe | Deterministic | Mechanical and exactly specifiable. A model here adds cost, latency and nondeterminism for nothing. |
-| Alignment tier 1 | Deterministic (Levenshtein, token overlap, containment) | Resolves clean labeled input completely. On those inputs **no model call happens at all** — the comparison is instant and free. |
-| Alignment tier 2 | Model, structured output | Only receives what tier 1 could not place. Heavy rewrites defeat string similarity but are obvious to a reader. |
-| Reading text inside images | Vision model, confidence-gated | Text baked into artwork is invisible to every other check. Capped at Warning — extraction confidence doesn't support a hard verdict. |
-| Verdicts | **Deterministic, always** | See rule 1. |
-| Finding explanations | Model, one batched call | The only genuinely generative step. Replaced hand-written templates. |
+| Matching rewritten copy | Claude Opus 5.5 | Claude Opus 5 |
+| Reading text inside images | Claude Opus 5 | Claude Sonnet 5.5 |
+| Explaining findings | Claude Sonnet 5.5 | Claude Opus 5 |
 
-**Both AI steps are allowed to fail.** If the API key is absent, the prepaid balance is exhausted,
-or a call errors, the pipeline returns exactly what the deterministic core alone would have
-returned. The app is complete and useful without either.
+Each AI call gives up after 45 seconds and moves to the backup, instead of waiting the default ten minutes. The limit comes from timing deliberately oversized jobs, where the slowest call took 28 seconds. The backups were tested against the real API by pointing each job at a model name that doesn't exist, and each backup took over in about three seconds. The site's footer lists the models in use, and it is generated from the same settings the app runs on, so it updates whenever a model changes.
 
----
+## Other engineering decisions
 
-## Engineering decisions worth calling out
+**Thresholds come from tests.** The score that decides whether two pieces of text are the same block started as a guess of 0.90. Testing it against the full set of example emails showed every pair that should match scoring 0.91 or higher and every pair that shouldn't scoring 0.75 or lower. The threshold is set at 0.85, in the middle of that gap, instead of at 0.90, right at the edge where a slightly reworded paragraph would stop matching.
 
-**Thresholds were tuned against an eval set, not by feel.** The tier-1 alignment threshold began at
-a guessed 0.90. Sweeping it against the fixture set showed every pair that must match scoring ≥ 0.91
-and every pair that must not scoring ≤ 0.75 — a usable band of roughly (0.75, 0.91), with a cliff at
-0.92 where a paragraph reworded just short of the line stops matching and one honest wording failure
-becomes two wrong findings. The value sits near the centre of the band rather than on the edge of
-the cliff.
+**Fetching images is treated as a security risk.** The app accepts HTML from anyone, pulls image addresses out of it, and fetches them from its own server. That is a classic way to trick a server into reaching places it shouldn't, known as server-side request forgery. Every fetch is checked: the address has to be public (checked after looking up where the name actually points), redirects aren't followed, and only real images under 5 MB are accepted, within a time limit. A rejected fetch fails silently, because a detailed error message would help someone probe the server.
 
-**Models were chosen per job, by measurement.** The three AI jobs are configured independently
-because they were benchmarked independently, three runs each, after the shared eval set proved
-unable to separate them. The vision benchmark was decisive: on artwork with typos deliberately baked
-in, one candidate model read `Limted` as `Limited` and `Shiping` as `Shipping` at 0.99 confidence on
-every run — silently repairing the exact defect the step exists to catch. A cheaper model can score well
-overall and still be wrong about the one thing you picked it for.
+**The limits are described as they are.** Rate limiting allows 50 comparisons per IP address per hour. It runs in memory, so each server instance keeps its own count, and anyone determined could get around it. It is there to stop accidental loops, and nothing more. A shared database would make it airtight, and that was judged not worth it for an app of this size.
 
-**Fetching user-supplied image URLs is treated as a security boundary.** The app accepts arbitrary
-HTML from anonymous users, extracts URLs from it, and has the server fetch them — textbook SSRF
-exposure. Requests are validated on scheme, hostname, resolved IP (private and link-local ranges
-rejected after DNS resolution, not before), redirect behaviour, content type, response size and a
-hard timeout. Rejections are silent: a descriptive error message is a free probing tool for an
-attacker.
+**Speed was measured with a profiler.** Matching takes about 96% of the time on a large comparison, and its cost depends on how much text is left after the HTML is stripped. Real email exports are mostly markup. One measured template had 2.5 KB of copy inside 108 KB of HTML, so even 400 KB of HTML compares in about 24 milliseconds.
 
-**Limits are documented honestly rather than oversold.** Rate limiting is in-memory and therefore
-per-serverless-instance — it stops casual looping and runaway client code, and nothing more. The
-real spend ceiling is a prepaid balance with auto-reload off. Adding a database to make the limit
-rigorous was explicitly judged not worth it at this scale, and the reasoning is recorded next to the
-code rather than left for someone to rediscover.
-
-**Performance was profiled, not guessed.** Alignment is O(blocks × runs) with a Levenshtein per
-pair and accounts for ~96% of wall time on a large comparison. Cost tracks what survives extraction,
-so the HTML path is cheap at any size — 400 KB of markup compares in ~24 ms, because a real ESP
-export is overwhelmingly markup (one measured template carried 2.5 KB of copy under 108 KB of
-Outlook hacks and inline CSS).
-
----
-
-## Testing and evaluation
+## Testing
 
 | | |
 |---|---|
-| Unit tests | **291**, across 14 suites |
-| Eval fixtures | **28** end-to-end email pairs — 14 clean, 14 with a planted defect |
-| Current eval score | **14/14 defects caught, at the correct severity, 0 false positives** |
+| Unit tests | 305, in 15 test files |
+| End-to-end test set | 28 pairs of approved copy and final email: 14 that should pass and 14 with a planted mistake |
+| Score with AI | All 14 mistakes caught at the right severity, no false alarms, and 28 of 28 verdicts correct |
+| Score without AI | 13 of 14 mistakes caught, with 2 false alarms |
+| Model benchmark | 31 images, 64 matching decisions and 19 explanations, three runs per model |
 
-The eval set catches behaviour that unit tests can't express. Each fixture is a realistic
-approved-copy / final-email pair with a known expected outcome, covering clean cases that must stay
-clean (smart quotes, responsive duplicates, MJML wrappers, repeated CTAs,
-boilerplate footers) and defects that must be caught at the right level (changed wording, dropped
-sentences, injected paragraphs, reordered sections, capitalization drift).
-
-It grades **severity as well as detection**: flagging a real problem at the wrong level counts
-against the score. No threshold in the codebase changes without running it.
-
----
+The end-to-end set checks severity as well as detection, so catching a real problem at the wrong level counts against the score. No threshold in the code changes without running it. The scores above were measured on October 6, 2026.
 
 ## Tech stack
 
-**Application**
-- Next.js 16 (App Router, Server Components), React 19, TypeScript (strict)
-- Tailwind CSS v4
-- Deployed on Vercel, custom domain, automatic deploys from `main`
+The app is built with Next.js 16, React 19, TypeScript in strict mode and Tailwind CSS 4, and it is hosted on Vercel with automatic deploys from the main branch. It calls Claude through Anthropic's official TypeScript SDK, with Zod schemas so each model returns typed data instead of prose that has to be parsed. The comparison engine is plain TypeScript made of pure functions, with no dependencies beyond an HTML parser, and it is tested with Node's built-in test runner.
 
-**AI**
-- Anthropic API via the official TypeScript SDK
-- Zod schemas for structured model output — the model returns typed pairings and readings, not prose
-  to be parsed
-- Per-job model configuration, overridable by environment variable with no code change
-
-**Engine**
-- Pure TypeScript, no runtime dependencies beyond an HTML parser
-- Every module in the comparison core is composed of pure functions, which is what makes 291 unit
-  tests cheap to write and fast to run
-- Node's built-in test runner — no test framework dependency
-
-**Security & operations**
-- All model calls server-side; the API key never reaches the browser, the repo, or a log line
-- SSRF-hardened image fetching (see above)
-- Optional password gate: HMAC-signed session cookie, key derived from the password, expiry carried
-  in the cookie and signed over. Off by default; enabling it is one environment variable and no code
-  change
-- In-memory per-IP rate limiting with a documented, honest threat model
-- Nothing pasted by a user is stored anywhere
-
----
+All AI calls happen on the server, and the API key never reaches the browser, the code repository or the logs. Nothing a user pastes is stored. An optional password gate, using a signed session cookie, can be switched on with one setting and no code change.
 
 ## How this was built
 
-Driftless QA was built with [Claude Code](https://claude.com/claude-code), Anthropic's agentic
-coding tool, and this README was written with it too. The architecture, the product boundaries and
-the engineering decisions recorded above were mine to direct and review; a large share of the
-implementation was written by the model working to them.
+Driftless QA was built with [Claude Code](https://claude.com/claude-code), Anthropic's AI coding tool. Dave Hyde directed the project and made the final decisions, and Claude wrote the code.
 
----
+This README was written by Claude Opus 5.5 in Claude Code, from the project's own notes and a fresh run of its tests. Dave did not write or edit it.
 
-Built by **Dave Hyde** · [driftlessqa.com](https://driftlessqa.com) · [About the project](https://driftlessqa.com/about)
+Built by **Dave Hyde** · [driftlessqa.com](https://driftlessqa.com)
