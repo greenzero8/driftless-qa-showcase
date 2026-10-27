@@ -137,8 +137,8 @@ All AI calls happen on the server, and the API key never reaches the browser, th
 
 ## How this was built
 
-Driftless QA was built with [Claude Code](https://claude.com/claude-code), Anthropic's AI coding tool. Dave Hyde directed the project and made the final decisions, and Claude wrote the code.
+Driftless QA was built with [Claude Code](https://claude.com/claude-code), Anthropic's AI coding tool. David Hyde directed the project and made the final decisions, and Claude wrote the code.
 
 This README was written by Claude Opus 5.5 in Claude Code, from the project's own notes and a fresh run of its tests.
 
-Built by **Dave Hyde** · [driftlessqa.com](https://driftlessqa.com)
+Built by **David Hyde** · [driftlessqa.com](https://driftlessqa.com)
