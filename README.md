@@ -137,7 +137,7 @@ Driftless QA is open to anyone, so I set up protections against abuse and runawa
 
 | | |
 |---|---|
-| Unit tests | 305, in 15 test files |
+| Unit tests | 313, in 16 test files |
 | End-to-end test set | 28 pairs of approved copy and final email: 14 that should pass and 14 with a planted mistake |
 | Score with AI | All 14 mistakes caught at the right severity, no false alarms, and 28 of 28 verdicts correct |
 | Score without AI | 13 of 14 mistakes caught, with 2 false alarms |
