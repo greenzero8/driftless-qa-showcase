@@ -16,11 +16,13 @@ The left box takes the approved copy, pasted from a copy doc. The right box take
 
 Each card shows the approved text next to what the email actually says, with a one-line explanation. Only failures count toward the verdict at the top.
 
-## Why it exists
+## Why this was built
 
-Email QA tools like Litmus and Email on Acid check rendering, links, accessibility and deliverability. None of them check whether the final email says what the approved copy said.
+David Hyde has worked in email marketing for a long time. In that work, one of the most important checks before an email goes out is still done entirely by hand: making sure the final email says what the approved copy said. Email QA tools like Litmus and Email on Acid check rendering, links, accessibility and deliverability, but none of them compare the finished email against the original copy. A person does that, reading the two side by side.
 
-Copy changes during production. It gets moved from a copy doc into an email builder, edited late and reviewed by several people, and small changes still get through: a changed price, last month's offer, a button that lost its capitalization, a paragraph that was dropped. Once an email is sent, it can't be unsent. Driftless QA does that one check.
+Copy changes during production. It gets moved from a copy doc into an email builder, edited late and reviewed by several people, and small changes still get through: a changed price, last month's offer, a button that lost its capitalization, a paragraph that was dropped. David has seen emails with the wrong copy get past the person who created the email, the person who built it in the email platform and a person whose full-time job was QA. Once an email is sent, it can't be unsent.
+
+Before building anything, David searched for a tool that already did this check, including the large email QA platforms. The search found one other product, created in July 2026, and nothing else. Driftless QA does that one check. It is not a commercial service and isn't meant to become one.
 
 ## How it works
 
@@ -143,6 +145,6 @@ All AI calls happen on the server, and the API key never reaches the browser, th
 
 Driftless QA was built with [Claude Code](https://claude.com/claude-code), Anthropic's AI coding tool. David Hyde directed the project and made the final decisions, and Claude wrote the code.
 
-This README was written by Claude Opus 5.5 in Claude Code, from the project's own notes and a fresh run of its tests.
+This README was written by Claude Opus 5.5 in Claude Code, from the project's own notes and a fresh run of its tests. David Hyde edited it.
 
 Built by **David Hyde** · [driftlessqa.com](https://driftlessqa.com)
