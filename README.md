@@ -18,11 +18,11 @@ Each card shows the approved text next to what the email actually says, with a o
 
 ## Why this was built
 
-David Hyde has worked in email marketing for a long time. In that work, one of the most important checks before an email goes out is still done entirely by hand: making sure the final email says what the approved copy said. Email QA tools like Litmus and Email on Acid check rendering, links, accessibility and deliverability, but none of them compare the finished email against the original copy. A person does that, reading the two side by side.
+I have extensive professional experience in business-to-business email marketing, including for Fortune 10 and other Fortune 100 companies, both in-house and at an agency or service provider. In that work, one of the most important checks before an email goes out is still done entirely by hand: making sure the final email says what the approved copy said. Email QA tools like Litmus and Email on Acid check rendering, links, accessibility and deliverability, but none of them compare the finished email against the original copy. A person does that, reading the two side by side.
 
-Copy changes during production. It gets moved from a copy doc into an email builder, edited late and reviewed by several people, and small changes still get through: a changed price, last month's offer, a button that lost its capitalization, a paragraph that was dropped. David has seen emails with the wrong copy get past the person who created the email, the person who built it in the email platform and a person whose full-time job was QA. Once an email is sent, it can't be unsent.
+Copy changes during production. It gets moved from a copy doc into an email builder, edited late and reviewed by several people, and small changes still get through: a changed price, last month's offer, a button that lost its capitalization, a paragraph that was dropped. I've seen emails with the wrong copy get past the person who created the email, the person who built it in the email platform and a person whose full-time job was QA. Once an email is sent, it can't be unsent.
 
-Before building anything, David searched for a tool that already did this check, including the large email QA platforms. The search found one other product, created in July 2026, and nothing else. Driftless QA does that one check. It is not a commercial service and isn't meant to become one.
+Before building anything, I searched for a tool that already did this check, including the large email QA platforms. I found one other product, launched in July 2026, and nothing else. Driftless QA does that one check. It is not a commercial service and isn't meant to become one.
 
 ## How it works
 
@@ -93,11 +93,13 @@ Every AI step is allowed to fail without breaking the app. When a call fails, th
 
 ## Choosing and testing the models
 
-The three AI jobs use different models because each job was tested on its own. The app's end-to-end test set can't tell models apart on these jobs, so a separate benchmark measures them directly: 31 generated images with known text (including typos baked into the artwork and hard cases like script fonts, faint text and letter-spaced capitals), 16 matching cases with 64 decisions that each have one right answer, and 19 real findings whose explanations are read side by side. Every model runs every job three times.
+I started building Driftless QA in late August 2026, and Anthropic released new models while I was working on it, including Claude Opus 5.5. When a new model came out, I tested it against the models already in use, one AI job at a time. I chose which model handles each job, and at what level of reasoning effort, based on accuracy, speed and price. The app started with Claude Opus 5 on all three jobs and now uses three different models.
+
+The app's end-to-end test set can't tell models apart on these jobs, so a separate benchmark measures them directly: 31 generated images with known text (including typos baked into the artwork and hard cases like script fonts, faint text and letter-spaced capitals), 16 matching cases with 64 decisions that each have one right answer, and 19 real findings whose explanations are read side by side. Every model runs every job three times.
 
 A few results shaped the current setup. In September, Claude Haiku 4.5 read the typo "Limted" in an image as "Limited", at 99% confidence, on every run. It scored well overall, but it silently fixed the exact kind of mistake the image check exists to catch. The newest model wasn't the best choice for every job either. Claude Opus 5.5 read every test image correctly, but it rated its confidence on the hardest ones at exactly the app's 80% cutoff, where a small drop would make the app throw a correct reading away. So image reading stayed on Claude Opus 5.
 
-The benchmark also tests each model at low, medium and high thinking levels, and more thinking wasn't always better. For image reading on Opus 5, high fixed a misread that low made twice in three runs, where it read letter-spaced capitals as "L I M I T E D". On Opus 5.5 the same change lowered its confidence until it started discarding correct readings. Each job's level is now set from these results: high for image reading, and medium for matching and explanations. Explanations moved to Claude Sonnet 5.5, which wrote them as accurately as Opus, about a second faster per call, at 40% of the price.
+The benchmark also tests each model at low, medium and high reasoning effort, and more effort wasn't always better. For image reading on Opus 5, high fixed a misread that low made twice in three runs, where it read letter-spaced capitals as "L I M I T E D". On Opus 5.5 the same change lowered its confidence until it started discarding correct readings. Each job's effort level is now set from these results: high for image reading, and medium for matching and explanations. Explanations moved to Claude Sonnet 5.5, which wrote them as accurately as Opus, about a second faster per call, at 40% of the price.
 
 Anthropic's status page showed problems affecting these models every week or two during September, usually for one to three hours, and most of them hit a single model. So each job has a backup on a different model:
 
@@ -115,13 +117,21 @@ Each AI call gives up after 45 seconds and moves to the backup, instead of waiti
 
 **Fetching images is treated as a security risk.** The app accepts HTML from anyone, pulls image addresses out of it, and fetches them from its own server. That is a classic way to trick a server into reaching places it shouldn't, known as server-side request forgery. Every fetch is checked: the address has to be public (checked after looking up where the name actually points), redirects aren't followed, and only real images under 5 MB are accepted, within a time limit. A rejected fetch fails silently, because a detailed error message would help someone probe the server.
 
-**The limits are described as they are.** Rate limiting allows 50 comparisons per IP address per hour. It runs in memory, so each server instance keeps its own count, and anyone determined could get around it. It is there to stop accidental loops, and nothing more. A shared database would make it airtight, and that was judged not worth it for an app of this size.
-
 **Speed was measured with a profiler.** Matching takes about 96% of the time on a large comparison, and its cost depends on how much text is left after the HTML is stripped. Real email exports are mostly markup. One measured template had 2.5 KB of copy inside 108 KB of HTML, so even 400 KB of HTML compares in about 24 milliseconds.
 
 ## What happens to pasted copy
 
-The approved copy and the final email go from the browser to the app's server, and nothing is saved along the way. Only the parts that need AI are sent on to Anthropic's API: copy the first matching pass couldn't place, the images in the email, and the findings to be explained. Pasted copy never goes into a URL, where it would end up in browser history and server request logs. The app's own logs record only which model handled each AI job and why a call failed, and the site has no analytics or tracking cookies.
+The approved copy and the final email go from the browser to the app's server, and nothing is saved along the way. Only the parts that need AI are sent on to Anthropic's API: copy the first matching pass couldn't place, the images in the email, and the findings to be explained. Pasted copy never goes into a URL, where it would end up in browser history and server request logs. The app's own logs record only which model handled each AI job and why a call failed. Because anyone can use the site, I chose not to add Google Analytics or any other tracking, so it has no analytics or tracking cookies.
+
+## Protecting a public app
+
+Driftless QA is open to anyone, so I set up protections against abuse and runaway costs.
+
+**Rate limiting stops accidents, not attackers.** The app allows 50 comparisons per IP address per hour. It runs in memory, so each server instance keeps its own count, and anyone determined could get around it. A shared database would make it airtight, and I decided that wasn't worth it for an app of this size.
+
+**AI spending has a monthly cap.** The app's AI calls are paid for with prepaid Anthropic API credits. The credits reload automatically, so the app doesn't stop working when the balance runs low, but the reloads stop at a monthly limit. A bot, or a loop that gets past the rate limit, can't spend more than that.
+
+**The whole site can be locked in one step.** If I see signs that someone is trying to reverse-engineer the app or use its results to train a copy of it (known as distillation), or if it reaches people I don't want using it, I can put the site behind a password with one setting and no code change. The password gate is already built and switched off, and it uses a signed session cookie.
 
 ## Testing
 
@@ -139,12 +149,12 @@ The end-to-end set checks severity as well as detection, so catching a real prob
 
 The app is built with Next.js 16, React 19, TypeScript in strict mode and Tailwind CSS 4, and it is hosted on Vercel with automatic deploys from the main branch. It calls Claude through Anthropic's official TypeScript SDK, with Zod schemas so each model returns typed data instead of prose that has to be parsed. The comparison engine is plain TypeScript made of pure functions, with no dependencies beyond an HTML parser, and it is tested with Node's built-in test runner.
 
-All AI calls happen on the server, and the API key never reaches the browser, the code repository or the logs. Nothing a user pastes is stored. An optional password gate, using a signed session cookie, can be switched on with one setting and no code change.
+All AI calls happen on the server, and the API key never reaches the browser, the code repository or the logs. Nothing a user pastes is stored.
 
 ## How this was built
 
-Driftless QA was built with [Claude Code](https://claude.com/claude-code), Anthropic's AI coding tool. David Hyde directed the project and made the final decisions, and Claude wrote the code.
+Driftless QA was built with [Claude Code](https://claude.com/claude-code), Anthropic's AI coding tool. I directed the project and made the final decisions, and Claude wrote the code.
 
-This README was written by Claude Opus 5.5 in Claude Code, from the project's own notes and a fresh run of its tests. David Hyde edited it.
+This README was written by Claude Opus 5.5 in Claude Code, from the project's own notes and a fresh run of its tests. I edited it.
 
 Built by **David Hyde** · [driftlessqa.com](https://driftlessqa.com)
