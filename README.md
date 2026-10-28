@@ -117,6 +117,10 @@ Each AI call gives up after 45 seconds and moves to the backup, instead of waiti
 
 **Speed was measured with a profiler.** Matching takes about 96% of the time on a large comparison, and its cost depends on how much text is left after the HTML is stripped. Real email exports are mostly markup. One measured template had 2.5 KB of copy inside 108 KB of HTML, so even 400 KB of HTML compares in about 24 milliseconds.
 
+## What happens to pasted copy
+
+The approved copy and the final email go from the browser to the app's server, and nothing is saved along the way. Only the parts that need AI are sent on to Anthropic's API: copy the first matching pass couldn't place, the images in the email, and the findings to be explained. Pasted copy never goes into a URL, where it would end up in browser history and server request logs. The app's own logs record only which model handled each AI job and why a call failed, and the site has no analytics or tracking cookies.
+
 ## Testing
 
 | | |
