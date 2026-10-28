@@ -119,6 +119,20 @@ Each AI call gives up after 45 seconds and moves to the backup, instead of waiti
 
 **Speed was measured with a profiler.** Matching takes about 96% of the time on a large comparison, and its cost depends on how much text is left after the HTML is stripped. Real email exports are mostly markup. One measured template had 2.5 KB of copy inside 108 KB of HTML, so even 400 KB of HTML compares in about 24 milliseconds.
 
+## Accessibility
+
+Driftless QA is meant to be used on a computer, and people paste into it rather than type, but it still has to work for someone using a keyboard, a screen reader or larger text.
+
+- **Contrast.** The text colors were measured against the WCAG AA contrast standard and darkened wherever they fell short, including the gray used for secondary text and the hover color on buttons. Pass, fail and warning are always written out as words, never shown by color alone.
+- **Text size.** Text is sized relative to the browser's own text setting, so someone who sets a larger default font size gets a larger app. Long words wrap instead of being cut off.
+- **Keyboard.** Every control is a standard button or a native expand-and-collapse element, and the focused element is always visibly marked.
+- **Screen readers.** Each paste box has a label. When a comparison starts, the screen reader announces it and which step it's on. When results arrive, focus moves to the verdict so it is read out straight away, and each finding has its own heading, so a screen reader user can jump from one to the next. Errors are announced as soon as they appear.
+- **Motion.** The small animations switch off for anyone who has asked their system to reduce motion.
+
+The way results are shown helps too. Each finding sets the approved text next to the final text and explains the difference in a sentence, so nothing depends on seeing colored highlighting.
+
+These changes were checked in the code and in the browser, but the app hasn't been tested with a screen reader yet. Testing with VoiceOver on macOS is the next step.
+
 ## What happens to pasted copy
 
 The approved copy and the final email go from the browser to the app's server, and nothing is saved along the way. Only the parts that need AI are sent on to Anthropic's API: copy the first matching pass couldn't place, the images in the email, and the findings to be explained. Pasted copy never goes into a URL, where it would end up in browser history and server request logs. The app's own logs record only which model handled each AI job and why a call failed. Because anyone can use the site, I chose not to add Google Analytics or any other tracking, so it has no analytics or tracking cookies.
